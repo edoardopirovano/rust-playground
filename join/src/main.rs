@@ -13,11 +13,10 @@ fn write_random_relation(index: usize) {
 }
 
 fn read_relation(index: usize) -> Relation {
-    read_from_file(&format!("relations/relation{}.bin", index))
+    read_from_file(&format!("relations/relation{}.bin", index)).unwrap()
 }
 
 fn main() {
-    std::fs::remove_dir_all("relations").unwrap();
     std::fs::create_dir("relations").unwrap();
     let mut rng = rand::thread_rng();
     let num_relations = rng.gen_range(3..20);

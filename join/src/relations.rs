@@ -1,4 +1,6 @@
+use crc32fast::Hasher;
 use rand::Rng;
+use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
 use std::fs::File;
@@ -9,6 +11,28 @@ pub struct Relation {
     pub data: Vec<i32>,
     pub size: usize,
     pub arity: usize,
+}
+
+#[derive(Debug)]
+struct ChecksumError {
+    expected: u32,
+    actual: u32,
+}
+
+impl fmt::Display for ChecksumError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Checksum error: expected {}, actual {}",
+            self.expected, self.actual
+        )
+    }
+}
+
+impl Error for ChecksumError {
+    fn description(&self) -> &str {
+        "Expected checksum does not match actual checksum"
+    }
 }
 
 impl Relation {
@@ -87,11 +111,16 @@ impl Relation {
 
     pub fn write_to_file(&self, filename: &str) -> std::io::Result<()> {
         let mut buffer = File::create(filename)?;
+        let mut hasher = Hasher::new();
         buffer.write(&self.size.to_le_bytes())?;
+        hasher.update(&self.size.to_le_bytes());
         buffer.write(&self.arity.to_le_bytes())?;
+        hasher.update(&self.arity.to_le_bytes());
         for x in &self.data {
             buffer.write(&x.to_le_bytes())?;
+            hasher.update(&x.to_le_bytes());
         }
+        buffer.write(&hasher.finalize().to_le_bytes())?;
         Ok(())
     }
 }
@@ -114,20 +143,31 @@ pub fn make_sorted(data: Vec<i32>, size: usize, arity: usize) -> Relation {
     relation
 }
 
-pub fn read_from_file(filename: &str) -> Relation {
+pub fn read_from_file(filename: &str) -> Result<Relation, Box<dyn Error>> {
     let mut buffer = File::open(filename).unwrap();
+    let mut hasher = Hasher::new();
     let mut scratch = [0; 8];
-    buffer.read(&mut scratch).unwrap();
+    buffer.read(&mut scratch)?;
     let size = usize::from_le_bytes(scratch);
-    buffer.read(&mut scratch).unwrap();
+    hasher.update(&scratch);
+    buffer.read(&mut scratch)?;
     let arity = usize::from_le_bytes(scratch);
+    hasher.update(&scratch);
     let mut data = Vec::new();
     for _ in 0..(size * arity) {
         let mut scratch = [0; 4];
-        buffer.read(&mut scratch).unwrap();
+        buffer.read(&mut scratch)?;
         data.push(i32::from_le_bytes(scratch));
+        hasher.update(&scratch);
     }
-    make_sorted(data, size, arity)
+    let mut scratch = [0; 4];
+    buffer.read(&mut scratch)?;
+    let expected = u32::from_le_bytes(scratch);
+    let actual = hasher.finalize();
+    if expected != actual {
+        return Err(Box::new(ChecksumError { expected, actual }));
+    }
+    Ok(Relation { data, size, arity })
 }
 
 pub fn random_sorted_relation() -> Relation {
@@ -173,7 +213,7 @@ mod tests {
         let temp_file = "temp.bin";
         let relation = super::random_sorted_relation();
         relation.write_to_file(&temp_file).unwrap();
-        let read_relation = super::read_from_file(&temp_file);
+        let read_relation = super::read_from_file(&temp_file).unwrap();
         assert_eq!(relation, read_relation);
         std::fs::remove_file(temp_file).unwrap();
     }
