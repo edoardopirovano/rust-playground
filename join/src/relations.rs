@@ -1,6 +1,8 @@
 use rand::Rng;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fs::File;
+use std::io::prelude::*;
 
 #[derive(PartialEq, Debug)]
 pub struct Relation {
@@ -82,6 +84,16 @@ impl Relation {
             self.set(b, j, temp);
         }
     }
+
+    pub fn write_to_file(&self, filename: &str) -> std::io::Result<()> {
+        let mut buffer = File::create(filename)?;
+        buffer.write(&self.size.to_le_bytes())?;
+        buffer.write(&self.arity.to_le_bytes())?;
+        for x in &self.data {
+            buffer.write(&x.to_le_bytes())?;
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Relation {
@@ -100,6 +112,22 @@ pub fn make_sorted(data: Vec<i32>, size: usize, arity: usize) -> Relation {
     let mut relation = Relation { data, size, arity };
     relation.sort();
     relation
+}
+
+pub fn read_from_file(filename: &str) -> Relation {
+    let mut buffer = File::open(filename).unwrap();
+    let mut scratch = [0; 8];
+    buffer.read(&mut scratch).unwrap();
+    let size = usize::from_le_bytes(scratch);
+    buffer.read(&mut scratch).unwrap();
+    let arity = usize::from_le_bytes(scratch);
+    let mut data = Vec::new();
+    for _ in 0..(size * arity) {
+        let mut scratch = [0; 4];
+        buffer.read(&mut scratch).unwrap();
+        data.push(i32::from_le_bytes(scratch));
+    }
+    make_sorted(data, size, arity)
 }
 
 pub fn random_sorted_relation() -> Relation {
@@ -138,5 +166,15 @@ mod tests {
             format!("{}", relation),
             "Relation of arity 2 and size 3. Tuples: [1,2][3,4][5,6]"
         );
+    }
+
+    #[test]
+    fn write_then_read() {
+        let temp_file = "temp.bin";
+        let relation = super::random_sorted_relation();
+        relation.write_to_file(&temp_file).unwrap();
+        let read_relation = super::read_from_file(&temp_file);
+        assert_eq!(relation, read_relation);
+        std::fs::remove_file(temp_file).unwrap();
     }
 }

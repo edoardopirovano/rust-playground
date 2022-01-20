@@ -47,7 +47,7 @@ fn binary_search(relation: &Relation, low: usize, high: usize, prefix: usize) ->
     bot
 }
 
-pub fn do_join(left: Relation, right: Relation, prefix: usize) -> Relation {
+pub fn do_join(left: &Relation, right: &Relation, prefix: usize) -> Relation {
     let arity = left.arity + right.arity - prefix;
     let mut data = Vec::new();
     let mut left_index = 0;
@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn test_unary_join() {
         assert_eq!(
-            super::do_join(unary_relation_a(), unary_relation_b(), 1),
+            super::do_join(&unary_relation_a(), &unary_relation_b(), 1),
             Relation {
                 data: vec![3, 5],
                 size: 2,
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn test_unary_with_ternary_join() {
         assert_eq!(
-            super::do_join(unary_relation_a(), relation_arity_3(), 1),
+            super::do_join(&unary_relation_a(), &relation_arity_3(), 1),
             Relation {
                 data: vec![2, 3, 5],
                 size: 1,
@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_complex_join() {
         assert_eq!(
-            super::do_join(relation_arity_3(), relation_arity_4(), 2),
+            super::do_join(&relation_arity_3(), &relation_arity_4(), 2),
             Relation {
                 data: vec![
                     0, 1, 5, 0, 0, // Tuple 1
