@@ -153,7 +153,7 @@ pub fn read_from_file(filename: &str) -> Result<Relation, Box<dyn Error>> {
     buffer.read(&mut scratch)?;
     let arity = usize::from_le_bytes(scratch);
     hasher.update(&scratch);
-    let mut data = Vec::new();
+    let mut data = Vec::with_capacity(size * arity);
     for _ in 0..(size * arity) {
         let mut scratch = [0; 4];
         buffer.read(&mut scratch)?;
